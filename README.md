@@ -1,4 +1,5 @@
 # MY_Sight
+My Sight:Back-End for AI-Powered Smart Glasses for Visually Impaired and Alzheimer's Patients 
 
 A Django-based application for managing patient-companion relationships and medical reminders.
 
