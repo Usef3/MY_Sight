@@ -52,6 +52,7 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    # هذه الحقول للكتابة فقط عند تحديث معلومات الملف الشخصي
     patient_username = serializers.CharField(write_only=True, required=False)
     companion_username = serializers.CharField(write_only=True, required=False)
     relationship = serializers.ChoiceField(
@@ -59,27 +60,41 @@ class ProfileSerializer(serializers.ModelSerializer):
         write_only=True,
         required=False
     )
+
+    # إضافة حقل يظهر اسم المريض المرتبط إذا كان المستخدم مرافق
+    related_patient = serializers.SerializerMethodField()
+
+    # إضافة حقل يظهر اسم المرافق والعلاقة إذا كان المستخدم مريض
     related_companion = serializers.SerializerMethodField()
 
     class Meta:
         model = User
         fields = (
-            'id', 'username', 'email', 'phone_number', 'name', 
-            'profile_photo', 'patient_username', 
-            'companion_username', 'relationship', 'related_companion'
+            'id', 'username', 'email', 'phone_number', 'name', 'location', 'profile_photo',
+            'patient_username', 'companion_username', 'relationship',
+            'related_patient',  # ← الحقل الجديد لمرافقي المرضى
+            'related_companion'  # ← الحقل الجديد للمرضى
         )
-        read_only_fields = ('username',)
+        read_only_fields = ('email',)
 
+    # هذه الدالة تعرض اسم المريض المرتبط بالمرافق إذا كان موجود
+    def get_related_patient(self, obj):
+        if hasattr(obj, 'companions') and obj.companions.patient:
+            return obj.companions.patient.user.username  # إرجاع اسم المستخدم للمريض المرتبط
+        return None
+
+    # هذه الدالة تعرض اسم المرافق المرتبط والعلاقة إذا كان المستخدم مريض
     def get_related_companion(self, obj):
         if hasattr(obj, 'patients'):
             companion = obj.patients.companions.first()
             if companion:
                 return {
-                    'username': companion.user.username,
-                    
-                    'relationship': companion.relationship
+                    'username': companion.user.username,  # اسم المستخدم للمرافق
+                    'relationship': companion.relationship  # علاقة القرابة
                 }
         return None
+
+
 
 class CompanionProfileSerializer(serializers.ModelSerializer):
     
@@ -208,8 +223,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
             first_companion = patient.companions.first()
             if first_companion:
                 user_data["linked_companion_name"] = first_companion.user.username
+                user_data["relationship"] = first_companion.relationship
             else:
                 user_data["linked_companion_name"] = None
+                user_data["relationship"] = None
                 
 
         data["user"] = user_data

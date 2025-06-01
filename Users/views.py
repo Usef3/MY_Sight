@@ -228,19 +228,22 @@ class UserLogoutView(APIView):
 # Profile Views
 class ProfileUpdateView(generics.UpdateAPIView):
     serializer_class = ProfileSerializer
-    permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    permission_classes = [IsAuthenticated]  # فقط المستخدم المسجل دخوله يمكنه التعديل
+    parser_classes = [MultiPartParser, FormParser]  # دعم رفع صورة الملف الشخصي
 
+    # نعيد المستخدم الحالي كالكائن الذي سيتم تعديله
     def get_object(self):
         return self.request.user
 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()
+        instance = self.get_object()  # المستخدم الحالي
+
+        # نحدث الحقول العامة للمستخدم مثل الاسم ورقم الهاتف وغيرها
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        # Handle companion-specific fields
+        # لو المستخدم مرافق، نقوم بتحديث العلاقة والمريض المرتبط به
         if instance.account_type == 'companions':
             companion = instance.companions
             if 'relationship' in request.data:
@@ -253,25 +256,28 @@ class ProfileUpdateView(generics.UpdateAPIView):
                     return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
             companion.save()
 
-        # Handle patient-specific fields
+        # لو المستخدم مريض، نقوم بتحديث المرافق المرتبط به
         elif instance.account_type == 'patients':
             patient = instance.patients
             if 'companion_username' in request.data:
                 try:
                     companion = Companion.objects.get(user__username=request.data['companion_username'])
-                    # Remove old relationship if exists
+
+                    # إزالة الارتباط القديم إن وُجد
                     old_companion = patient.companions.first()
-                    if old_companion:
+                    if old_companion and old_companion != companion:
                         old_companion.patient = None
                         old_companion.save()
-                    # Set new relationship
+
+                    # ربط المرافق الجديد بالمريض
                     companion.patient = patient
                     companion.save()
                 except Companion.DoesNotExist:
                     return Response({"error": "Companion not found"}, status=status.HTTP_404_NOT_FOUND)
             patient.save()
 
-        return Response(serializer.data)
+        # نعيد البيانات بعد التحديث، وتشمل بيانات الطرف المرتبط (relationship & username)
+        return Response(self.get_serializer(instance).data)
 
 
 class CompanionProfileUpdateView(generics.UpdateAPIView):

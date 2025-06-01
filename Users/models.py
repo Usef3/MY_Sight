@@ -19,6 +19,7 @@ class User(AbstractUser):
     location = models.CharField(max_length=255, blank=True, null=True)
     creation_date = models.DateTimeField(auto_now_add=True)
     profile_photo = models.ImageField(upload_to='profile_photos/', blank=True, null=True)
+    
 
     USERNAME_FIELD = 'email'  # 🔥 اجعل تسجيل الدخول بالبريد الإلكتروني
     REQUIRED_FIELDS = ['username']  # 🔑 نحتاج هذا للحفاظ على التوافق
