@@ -10,7 +10,7 @@ MY_Sight/
 ├── MY_Sight/                 # Project configuration directory
 │   ├── __init__.py
 │   ├── settings.py          # Project settings
-│   ├── urls.py             # Main URL configuration
+│   ├── urls.py             # Main URL configuration 
 │   ├── asgi.py             # ASGI configuration
 │   └── wsgi.py             # WSGI configuration
 │
