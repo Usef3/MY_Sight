@@ -23,12 +23,8 @@ from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import render
 from django.conf import settings
 
-
-
-
 User = get_user_model()
 
-# ✅ Password Reset Request View
 class PasswordResetRequestView(APIView):
     permission_classes = [AllowAny]
 
@@ -47,7 +43,6 @@ class PasswordResetRequestView(APIView):
         uid = urlsafe_base64_encode(force_bytes(user.pk))
         reset_link = f"https://your-frontend.com/reset-password?uid={uid}&token={token}"
 
-
         send_mail(
             "Reset Your Password",
             f"Click the link below to reset your password:\n{reset_link}",
@@ -58,8 +53,6 @@ class PasswordResetRequestView(APIView):
 
         return Response({"message": "A password reset link has been sent to your email."}, status=status.HTTP_200_OK)
 
-
-# ✅ Password Reset Confirm View
 class PasswordResetConfirmView(APIView):
     permission_classes = [AllowAny]
 
@@ -110,34 +103,26 @@ class PasswordResetConfirmView(APIView):
         except Exception as e:
             return Response({"error": "Failed to reset password. Please try again."}, status=status.HTTP_500_INTERNAL_SERVER_ERROR)
 
-
-# User Views
 class UserListCreateView(generics.ListCreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [AllowAny]  
-
 
 class UserDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [AllowAny]  
 
-
-# Patient Views
 class PatientListCreateView(generics.ListCreateAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [AllowAny]  
-
 
 class PatientDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Patient.objects.all()
     serializer_class = PatientSerializer
     permission_classes = [AllowAny]  
 
-
-# Companion Views
 class CompanionListCreateView(generics.ListCreateAPIView):
     queryset = Companion.objects.all()
     serializer_class = CompanionSerializer
@@ -148,7 +133,6 @@ class CompanionDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = CompanionSerializer
     permission_classes = [AllowAny] 
 
-# Reminder Views
 class ReminderListCreateView(generics.ListCreateAPIView):
     queryset = Reminder.objects.all()
     serializer_class = ReminderSerializer
@@ -159,19 +143,16 @@ class ReminderDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = ReminderSerializer
     permission_classes = [AllowAny] 
 
-# Location Views
 class LocationListCreateView(generics.ListCreateAPIView):
     queryset = Location.objects.all()
     serializer_class = LocationSerializer
     permission_classes = [AllowAny] 
-    
 
 class LocationDetailView(generics.RetrieveUpdateDestroyAPIView):
     queryset = Location.objects.all()
     serializer_class = LocationSerializer
     permission_classes = [AllowAny] 
 
-# Task Views
 class TaskListCreateView(generics.ListCreateAPIView):
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
@@ -182,7 +163,6 @@ class TaskDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = TaskSerializer
     permission_classes = [AllowAny] 
 
-# Notification Views
 class NotificationListCreateView(generics.ListCreateAPIView):
     queryset = Notification.objects.all()
     serializer_class = NotificationSerializer
@@ -193,11 +173,10 @@ class NotificationDetailView(generics.RetrieveUpdateDestroyAPIView):
     serializer_class = NotificationSerializer
     permission_classes = [AllowAny] 
 
-# User Registration
 class UserRegistrationView(generics.CreateAPIView):
     serializer_class = UserSerializer
     permission_classes = [AllowAny]
-    
+
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         if serializer.is_valid():
@@ -211,8 +190,6 @@ class UserRegistrationView(generics.CreateAPIView):
             "errors": serializer.errors
         }, status=status.HTTP_400_BAD_REQUEST)
 
-
-# User Logout
 class UserLogoutView(APIView):
     permission_classes = [AllowAny]
 
@@ -225,25 +202,20 @@ class UserLogoutView(APIView):
         except Exception:
             return Response({"error": "Invalid token"}, status=status.HTTP_400_BAD_REQUEST)
 
-# Profile Views
 class ProfileUpdateView(generics.UpdateAPIView):
     serializer_class = ProfileSerializer
-    permission_classes = [IsAuthenticated]  # فقط المستخدم المسجل دخوله يمكنه التعديل
-    parser_classes = [MultiPartParser, FormParser]  # دعم رفع صورة الملف الشخصي
+    permission_classes = [IsAuthenticated]
+    parser_classes = [MultiPartParser, FormParser]
 
-    # نعيد المستخدم الحالي كالكائن الذي سيتم تعديله
     def get_object(self):
         return self.request.user
 
     def update(self, request, *args, **kwargs):
-        instance = self.get_object()  # المستخدم الحالي
-
-        # نحدث الحقول العامة للمستخدم مثل الاسم ورقم الهاتف وغيرها
+        instance = self.get_object()
         serializer = self.get_serializer(instance, data=request.data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 
-        # لو المستخدم مرافق، نقوم بتحديث العلاقة والمريض المرتبط به
         if instance.account_type == 'companions':
             companion = instance.companions
             if 'relationship' in request.data:
@@ -256,29 +228,22 @@ class ProfileUpdateView(generics.UpdateAPIView):
                     return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
             companion.save()
 
-        # لو المستخدم مريض، نقوم بتحديث المرافق المرتبط به
         elif instance.account_type == 'patients':
             patient = instance.patients
             if 'companion_username' in request.data:
                 try:
                     companion = Companion.objects.get(user__username=request.data['companion_username'])
-
-                    # إزالة الارتباط القديم إن وُجد
                     old_companion = patient.companions.first()
                     if old_companion and old_companion != companion:
                         old_companion.patient = None
                         old_companion.save()
-
-                    # ربط المرافق الجديد بالمريض
                     companion.patient = patient
                     companion.save()
                 except Companion.DoesNotExist:
                     return Response({"error": "Companion not found"}, status=status.HTTP_404_NOT_FOUND)
             patient.save()
 
-        # نعيد البيانات بعد التحديث، وتشمل بيانات الطرف المرتبط (relationship & username)
         return Response(self.get_serializer(instance).data)
-
 
 class CompanionProfileUpdateView(generics.UpdateAPIView):
     serializer_class = CompanionProfileSerializer
@@ -295,7 +260,6 @@ class CompanionProfileUpdateView(generics.UpdateAPIView):
         self.perform_update(serializer)
         return Response(serializer.data)
 
-
 class PatientProfileUpdateView(generics.UpdateAPIView):
     serializer_class = PatientProfileSerializer
     permission_classes = [IsAuthenticated]
@@ -310,12 +274,6 @@ class PatientProfileUpdateView(generics.UpdateAPIView):
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
         return Response(serializer.data)
-
-
-
-
-
-
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
