@@ -22,6 +22,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import render
 from django.conf import settings
+from django.utils import timezone
 
 User = get_user_model()
 
@@ -175,7 +176,7 @@ class NotificationDetailView(generics.RetrieveUpdateDestroyAPIView):
 
 class UserRegistrationView(generics.CreateAPIView):
     serializer_class = UserSerializer
-    permission_classes = [AllowAny]
+    permission_classes = [AllowAny]  # Allow unauthenticated access
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -247,7 +248,7 @@ class ProfileUpdateView(generics.UpdateAPIView):
 
 class CompanionProfileUpdateView(generics.UpdateAPIView):
     serializer_class = CompanionProfileSerializer
-    permission_classes = [IsAuthenticated]
+    permission_classes = [AllowAny]
     parser_classes = [MultiPartParser, FormParser]
 
     def get_object(self):
@@ -277,3 +278,79 @@ class PatientProfileUpdateView(generics.UpdateAPIView):
 
 class CustomTokenObtainPairView(TokenObtainPairView):
     serializer_class = CustomTokenObtainPairSerializer
+
+class SOSView(APIView):
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        user = request.user
+        is_active = request.data.get('is_active', False)
+
+        if not isinstance(is_active, bool):
+            return Response(
+                {
+                    "success": False,
+                    "message": "is_active must be true or false"
+                },
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            if user.account_type == 'companions':
+                companion = user.companions
+                companion.sos_alert = is_active
+                if is_active:
+                    companion.last_sos_time = timezone.now()
+                    # إرسال إشعار للمريض
+                    if companion.patient:
+                        Notification.objects.create(
+                            user=companion.patient.user,
+                            transmission_time=timezone.now(),
+                            notification_type='security',
+                            message=f"تنبيه SOS من {companion.user.name}"
+                        )
+                companion.save()
+
+                if is_active and not companion.patient:
+                    return Response({
+                        "success": False,
+                        "message": "لا يوجد مريض مرتبط بك"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            elif user.account_type == 'patients':
+                patient = user.patients
+                patient.sos_alert = is_active
+                if is_active:
+                    patient.last_sos_time = timezone.now()
+                    # إرسال إشعار لجميع المرافقين
+                    for companion in patient.companions.all():
+                        Notification.objects.create(
+                            user=companion.user,
+                            transmission_time=timezone.now(),
+                            notification_type='security',
+                            message=f"تنبيه SOS من {patient.user.name}"
+                        )
+                patient.save()
+
+                if is_active and not patient.companions.exists():
+                    return Response({
+                        "success": False,
+                        "message": "لا يوجد مرافقون مرتبطون بك"
+                    }, status=status.HTTP_400_BAD_REQUEST)
+
+            else:
+                return Response({
+                    "success": False,
+                    "message": "نوع الحساب غير معروف"
+                }, status=status.HTTP_400_BAD_REQUEST)
+
+            return Response({
+                "success": True,
+                "message": "تم تفعيل التنبيه بنجاح" if is_active else "تم إيقاف التنبيه بنجاح"
+            }, status=status.HTTP_200_OK)
+
+        except Exception as e:
+            return Response({
+                "success": False,
+                "message": "حدث خطأ أثناء معالجة الطلب"
+            }, status=status.HTTP_500_INTERNAL_SERVER_ERROR)

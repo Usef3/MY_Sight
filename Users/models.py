@@ -51,6 +51,8 @@ class Companion(models.Model):
     relationship = models.CharField(max_length=20, choices=RELATIONSHIP_CHOICES)
     alert_settings = models.TextField(blank=True, null=True)
     profile_photo = models.ImageField(upload_to='companion_photos/', blank=True, null=True)
+    sos_alert = models.BooleanField(default=False)
+    last_sos_time = models.DateTimeField(null=True, blank=True)
 
     def __str__(self):
         return f"Companions: {self.name}"
@@ -66,10 +68,12 @@ class Patient(models.Model):
     account_photo = models.ImageField(upload_to='patients_photos/', blank=True, null=True)
     current_gps_location = models.CharField(max_length=255, blank=True, null=True)
     additional_notes = models.TextField(blank=True, null=True)
+    sos_alert = models.BooleanField(default=False)
+    last_sos_time = models.DateTimeField(null=True, blank=True)
+
     @property
     def username(self):
-      return self.user.username
-
+        return self.user.username
 
     def __str__(self):
         return f"Patients: {self.name}"

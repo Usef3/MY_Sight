@@ -200,3 +200,13 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
 
         data["user"] = user_data
         return data
+
+
+class SOSSerializer(serializers.Serializer):
+    is_active = serializers.BooleanField()
+    target_id = serializers.IntegerField(read_only=True)  # سيتم تعبئته تلقائياً
+
+    def validate(self, attrs):
+        user = self.context['request'].user
+        attrs['sender_type'] = user.account_type  # 'patients' أو 'companions'
+        return attrs
