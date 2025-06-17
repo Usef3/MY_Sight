@@ -18,7 +18,7 @@ from rest_framework.permissions import AllowAny, IsAuthenticated
 from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.authentication import TokenAuthentication, BasicAuthentication
-from rest_framework.parsers import MultiPartParser, FormParser
+from rest_framework.parsers import MultiPartParser, FormParser, JSONParser
 from rest_framework_simplejwt.views import TokenObtainPairView
 from django.shortcuts import render
 from django.conf import settings
@@ -206,14 +206,29 @@ class UserLogoutView(APIView):
 class ProfileUpdateView(generics.UpdateAPIView):
     serializer_class = ProfileSerializer
     permission_classes = [IsAuthenticated]
-    parser_classes = [MultiPartParser, FormParser]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get_object(self):
         return self.request.user
 
     def update(self, request, *args, **kwargs):
         instance = self.get_object()
-        serializer = self.get_serializer(instance, data=request.data, partial=True)
+        
+        # Handle file upload
+        if 'profile_photo' in request.FILES:
+            # Delete old photo if exists
+            if instance.profile_photo:
+                instance.profile_photo.delete()
+            # Save new photo
+            instance.profile_photo = request.FILES['profile_photo']
+            instance.save()
+
+        # Handle other fields
+        data = request.data.copy()
+        if 'profile_photo' in data:
+            del data['profile_photo']  # Remove from data since we handled it separately
+
+        serializer = self.get_serializer(instance, data=data, partial=True)
         serializer.is_valid(raise_exception=True)
         self.perform_update(serializer)
 

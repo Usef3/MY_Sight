@@ -50,6 +50,8 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class ProfileSerializer(serializers.ModelSerializer):
+    profile_photo = serializers.ImageField(required=False, allow_null=True)
+
     class Meta:
         model = User
         fields = ('username', 'phone_number', 'profile_photo')
